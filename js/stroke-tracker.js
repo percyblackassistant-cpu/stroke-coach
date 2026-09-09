@@ -29,9 +29,11 @@
     const ctrlHoldMs = opts.ctrlHoldMs ?? 800; // ignore demod right after acquire
     const unlockAfterMs = opts.unlockAfterMs ?? 4000;
     const lockAmpFrac = opts.lockAmpFrac ?? 0.25;
-    const ki = opts.ki ?? 0.02;                // rad/s pull per rad of phase err
+    const ki = opts.ki ?? 0;                   // DEPRECATED: PLL must not steer freq (see control note)
     const kp = opts.kp ?? 0.12;                // phase snap fraction per step
     const maxOmegaStep = opts.maxOmegaStep ?? 0.05;
+    const validatorAlpha = opts.validatorAlpha ?? 0.4; // omega EMA toward spectral reading
+    const dispTauMs = opts.dispTauMs ?? 3000;  // display SPM EMA — final anti-jitter layer
     const detectorOpts = opts.detectorOpts ?? {};
 
     let buf = [];                    // {t, mag, s|null}
@@ -41,7 +43,7 @@
     let lastAcq = 0, lastLowT = 0;
     let meanSig = 0, lastSig = null;
     const sigVar = { m: 0, v: 0 };
-    let spm = null, lastT = null;
+    let spm = null, spmDisp = null, lastT = null;
     let axisVars = [0, 0, 0], axisMeans = [0, 0, 0], nAx = 0, axisIdx = null;
     let lastN = -1;
     let strokes = [];                // {catchT, curve|null}
@@ -63,7 +65,19 @@
 
     function theta(t) { return omega * (t - tLock) / 1000 + psi; }
 
-    function unlock() { locked = false; iqInit = false; spm = null; lastLowT = 0; }
+    function unlock() { locked = false; iqInit = false; spm = null; spmDisp = null; lastLowT = 0; }
+
+    // spectral helper: detector on the MOST RECENT winSecs of signed samples.
+    // (Longer windows include the acquisition transient and systematically
+    // disagree with steady-state readings — 092004 read 14 vs true 24 until
+    // the window was clipped; found validating v5.1 on the dataset.)
+    function recentSigned() {
+      const signed = [];
+      for (let i = 0; i < buf.length; i++) if (buf[i].s != null) signed.push({ t: buf[i].t, mag: buf[i].s });
+      if (!fs) return signed;
+      const cut = signed.length - Math.round(winSecs * fs);
+      return cut > 0 ? signed.slice(cut) : signed;
+    }
 
     function acquire(t) {
       if (t - lastAcq < acqEveryMs) return;
@@ -76,7 +90,7 @@
       for (let i = 0; i < buf.length; i++) if (buf[i].s != null) signed.push({ t: buf[i].t, mag: buf[i].s });
       if (signed.length < acquireMinSecs * fr0) return;
       lastAcq = t;
-      const spm0 = det.detectStrokeRate(signed, detectorOpts);
+      const spm0 = det.detectStrokeRate(recentSigned(), detectorOpts);
       if (spm0 == null) return;
       omega = 2 * Math.PI * spm0 / 60;
       // FFT coefficient at omega: Σ s·e^{-iωt} ≈ (AN/2)e^{iφ} for s=A·cos(ωt+φ).
@@ -180,21 +194,17 @@
       if (!locked) { acquire(t); lastT = t; return state(); }
 
       // periodic validator (research: two-stage hybrid): the spectral detector
-      // re-runs on the rolling signed buffer even while locked; a persistent
-      // ≥3 spm disagreement re-anchors the loop. Without this the asymmetric
-      // stroke waveform biases the phase detector and omega ramps past truth
-      // (found on the 16→24 drift synth: 31.6 spm after a 24 spm settle).
+      // re-runs on the rolling signed buffer even while locked; its reading is
+      // EMA-blended into omega. This is the ONLY frequency authority — see the
+      // control-step note for why the PLL must not steer frequency.
       if (t - lastAcq >= acqEveryMs * 2) {
-        const signed = [];
-        for (let i = 0; i < buf.length; i++) if (buf[i].s != null) signed.push({ t: buf[i].t, mag: buf[i].s });
+        const signed = recentSigned();
         if (fs && signed.length >= acquireMinSecs * fs) {
           lastAcq = t;
           const spmV = det.detectStrokeRate(signed, detectorOpts);
-          const cur = omega * 60 / (2 * Math.PI);
-          if (spmV != null && Math.abs(spmV - cur) > 3) {
-            // re-anchor, don't unlock: during rate ramps the spectrum legitimately
-            // lags the loop; unlocking mid-drift just bounces lock/unlock.
-            omega = 2 * Math.PI * spmV / 60;
+          if (spmV != null) {
+            const target = 2 * Math.PI * spmV / 60;
+            omega = omega * validatorAlpha + target * (1 - validatorAlpha);
           }
         }
       }
@@ -212,18 +222,19 @@
       thetaAbs += omega * dt / 1000;
       lastT = t;
 
-      // control step: steer only when demod amplitude is meaningful and past
-      // the post-acquire hold (else atan2 of noise == random walk into clamps)
+      // control step: phase-only. Frequency is NOT steered by the PLL: real
+      // stroke waveforms are asymmetric, which biases atan2 systematically and
+      // walks omega to the clamps (12 or 44 spm) no matter the gain — v5 lost
+      // 5/8 trials this way. Frequency authority belongs to the spectral
+      // validator (EMA-blended below); the loop only keeps phase aligned so
+      // stroke segmentation stays stable.
       const amp = 2 * Math.hypot(I, Q);
       const ea = expectAmp();
       if (t >= ctrlHoldUntil && t - lastCtrl >= ctrlMs && amp > lockAmpFrac * ea) {
         lastCtrl = t;
         const err = Math.atan2(Q, I);
         if (opts.onControl) opts.onControl(t, { err, omega, I, Q, amp, ea });
-        thetaAbs += kp * err;   // phase snap == psi adjustment on integrated phase
-        const dOmega = Math.max(-maxOmegaStep, Math.min(maxOmegaStep, ki * err));
-        omega = Math.min(2 * Math.PI * spmMax / 60, Math.max(2 * Math.PI * spmMin / 60, omega + dOmega));
-        ctrlHoldUntil = Math.max(ctrlHoldUntil, t + ctrlMs);
+        thetaAbs += kp * err;   // phase snap only
       }
 
       // lock quality: demod amp vs signal oscillation size
@@ -238,6 +249,10 @@
       buildCurves(t);
 
       spm = omega * 60 / (2 * Math.PI);
+      // display smoothing: exponential average over ~dispTauMs (tracker omega
+      // follows the spectrum, which legitimately wobbles on real water)
+      if (spmDisp === null) spmDisp = spm;
+      else spmDisp += (dt / (dispTauMs + dt)) * (spm - spmDisp);
       return state();
     }
 
@@ -245,7 +260,7 @@
       const ph = locked && omega > 0
         ? (((thetaAbs % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) / (2 * Math.PI)
         : null;
-      return { locked, spm: spm === null ? null : Math.round(spm * 10) / 10, phase: ph };
+      return { locked, spm: spmDisp === null ? null : Math.round(spmDisp * 10) / 10, phase: ph };
     }
 
     function driveCurve() {

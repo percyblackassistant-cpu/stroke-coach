@@ -61,7 +61,9 @@
     }
     if (bestSpm < 0) return null;
 
-    // harmonic folding: catch subharmonic picks (12 spm shown as half of real 24)
+    // harmonic folding: catch subharmonic picks (12 shown for real 24).
+    // Down-folding (44→22) was tried and REVERTED: it collided with the
+    // up-fold on 092004 (read 12 instead of 24) and lost a trial net.
     const foldK = opts.foldK ?? 0.35;
     if (bestSpm < spmMax / 1.6 && 2 * bestSpm <= spmMax) {
       const f = (2 * bestSpm) / 60;
