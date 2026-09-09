@@ -1,4 +1,4 @@
-// app.js — Stroke Coach v0: GPS speed + accelerometer-derived stroke rate
+// app.js — Stroke Coach v5: GPS speed + phase-locked stroke tracker
 const $ = (id) => document.getElementById(id);
 const state = {
   running: false,
@@ -6,9 +6,11 @@ const state = {
   startT: null,
   distance: 0,
   lastPos: null,
-  samples: [],     // motion ring buffer {t, mag}
+  samples: [],     // motion ring buffer {t, ax, ay, az}
   csvLog: [],
   motionActive: false,
+  gpsSpeed: null,  // m/s, latest good GPS fix
+  tracker: null,   // StrokeTracker (v5 PLL)
 };
 
 // ---------- accelerometer ----------
@@ -27,18 +29,21 @@ function onMotion(e) {
   const a = e.accelerationIncludingGravity;
   if (!a || a.x == null) return;
   const t = e.timeStamp;
-  const mag = Math.sqrt(a.x*a.x + a.y*a.y + a.z*a.z);
-  state.samples.push({ t, mag });
-  if (state.samples.length > 600) state.samples.shift();
+  const sample = { t, ax: a.x, ay: a.y, az: a.z };
+  state.samples.push(sample);
+  if (state.samples.length > 2000) state.samples.shift();
   state.csvLog.push(
-    `M,${Date.now()},${mag.toFixed(4)},${a.x.toFixed(3)},${a.y.toFixed(3)},${a.z.toFixed(3)}`);
+    `M,${Date.now()},${a.x.toFixed(3)},${a.y.toFixed(3)},${a.z.toFixed(3)}`);
   if (state.csvLog.length > 30000) state.csvLog.splice(0, 3000);
+  // feed the v5 tracker (continuous smooth SPM + phase + drive curves)
+  if (state.tracker) state.tracker.update(t, a.x, a.y, a.z);
 }
 
-// shared detector lives in stroke-detector.js (window.StrokeDetector)
-const { smooth, detectStrokeRate } = window.StrokeDetector;
-
-// ---------- stroke rate (v0: peak counting on smoothed |a|) ----------
+// shared modules: detector (acquisition) + tracker (smooth follow)
+const { smooth } = window.StrokeDetector;
+const trackerOpts = {
+  detectorOpts: { gateSpeed: () => state.gpsSpeed },
+};
 
 // ---------- GPS ----------
 function onGps(pos) {
@@ -51,6 +56,7 @@ function onGps(pos) {
     $('pace').textContent = c.speed > 0.4 ? fmtPace(500 / c.speed) : '--:--';
   }
   $('gps').textContent = c.accuracy < 25 ? `±${Math.round(c.accuracy)}m` : 'weak';
+  if (c.speed != null && c.speed >= 0) state.gpsSpeed = c.speed;
   if (state.lastPos) {
     state.distance += haversine(state.lastPos, c);
     $('dist').textContent = Math.round(state.distance);
@@ -73,11 +79,15 @@ function haversine(a, b) {
 // ---------- UI loop ----------
 function tick() {
   if (!state.running) return;
-  const spm = detectStrokeRate(state.samples);
-  if (spm) $('spm').firstChild.textContent = String(spm);
+  if (state.tracker) {
+    const s = state.tracker.state();
+    // smooth SPM with one decimal; '--' when unlocked (no confident rate)
+    $('spm').firstChild.textContent = s.spm != null ? s.spm.toFixed(1) : '--';
+  }
   const el = Math.floor((Date.now() - state.startT) / 1000);
   $('elapsed').textContent = `${Math.floor(el / 60)}:${String(el % 60).padStart(2, '0')}`;
   drawScope();
+  drawCurve();
   requestAnimationFrame(tick);
 }
 
@@ -85,7 +95,8 @@ function drawScope() {
   const c = $('scope'), ctx = c.getContext('2d');
   ctx.clearRect(0, 0, c.width, c.height);
   ctx.strokeStyle = '#1652f0'; ctx.lineWidth = 1.5; ctx.beginPath();
-  const sm = smooth(state.samples.slice(-240), 3);
+  const recent = state.samples.slice(-240).map(s => ({ t: s.t, mag: Math.hypot(s.ax, s.ay, s.az) }));
+  const sm = smooth(recent, 3);
   if (sm.length > 2) {
     const min = Math.min(...sm.map(s => s.mag)), max = Math.max(...sm.map(s => s.mag));
     const rng = Math.max(0.5, max - min);
@@ -98,6 +109,22 @@ function drawScope() {
   }
 }
 
+// erg-style drive curve (normalized shape, median of last ~8-12 strokes)
+function drawCurve() {
+  const c = $('curve'), ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  if (!state.tracker) return;
+  const curve = state.tracker.driveCurve();
+  if (!curve) return;
+  ctx.strokeStyle = '#2ecc71'; ctx.lineWidth = 2; ctx.beginPath();
+  curve.forEach((v, i) => {
+    const x = i / (curve.length - 1) * c.width;
+    const y = c.height / 2 - v * (c.height / 2 - 6);
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  });
+  ctx.stroke();
+}
+
 // ---------- session control ----------
 async function start() {
   try {
@@ -107,6 +134,8 @@ async function start() {
   }
   state.running = true; state.startT = Date.now();
   state.distance = 0; state.lastPos = null; state.csvLog = []; state.samples = [];
+  state.gpsSpeed = null;
+  state.tracker = window.StrokeTracker.createStrokeTracker(trackerOpts);
   state.watchId = navigator.geolocation.watchPosition(onGps, err => {
     $('gps').textContent = 'gps err';
   }, { enableHighAccuracy: true, maximumAge: 1000 });

@@ -100,7 +100,9 @@
   // Main entry. samples: [{t (ms), mag}]. Returns spm (number) or null.
   function detectStrokeRate(samples, opts = {}) {
     const gateMin = opts.gateMinSpeed ?? 0.5;
-    if (opts.gateSpeed != null && opts.gateSpeed < gateMin) return null;
+    // gateSpeed may be a number or a getter (live app passes latest GPS speed)
+    const gs = typeof opts.gateSpeed === 'function' ? opts.gateSpeed() : opts.gateSpeed;
+    if (gs != null && gs < gateMin) return null;
     if (!samples || samples.length < (opts.minSamples ?? 60)) return null;
     const fs = sampleRate(samples);
     if (!fs) return null;
@@ -114,9 +116,13 @@
     const secs = samples.length / fs;
     const full = estimateOne(mags, fs, opts);
 
-    // confidence path 1: quarter-window agreement (needs ≥ 8 s)
-    if (secs >= (opts.quarterMinSecs ?? 8)) {
-      const qMin = Math.max(30, Math.round(1.2 * fs)); // ≥1.2 s per quarter
+    // confidence path 1: quarter-window agreement. Only meaningful when each
+    // quarter contains ≥ ~2.5 strokes: at 45 spm a 4 s window is 3 cycles;
+    // shorter quarters have hopeless frequency resolution (~40 spm at 1.5 s)
+    // and the cluster gate would reject everything (found on 6 s synth).
+    const qSecs = opts.quarterSecs ?? 4;
+    if (secs >= 4 * qSecs) {
+      const qMin = Math.max(30, Math.round(qSecs * fs));
       const q = [];
       for (let k = 0; k < 4; k++) {
         const a = Math.floor((samples.length * k) / 4);
@@ -130,14 +136,9 @@
       if (cluster != null) return Math.round(cluster);
     }
 
-    // confidence path 2: very prominent full-window peak (rate drifted mid-window
-    // so quarters disagree, but the spectrum screams at one frequency)
-    if (full && full.ratio >= (opts.ratioFallback ?? 8)) {
-      return Math.round(full.spm);
-    }
-
-    // short buffers (live app start-up): single prominent estimate only
-    if (secs < (opts.quarterMinSecs ?? 8) && full && full.ratio >= (opts.shortRatio ?? 6)) {
+    // confidence path 2: prominent full-window peak (rate drifted mid-window
+    // so quarters disagree, but the spectrum is clear at one frequency)
+    if (full && full.ratio >= (opts.ratioFallback ?? 3)) {
       return Math.round(full.spm);
     }
 
