@@ -51,11 +51,12 @@
     function estimateFs() {
       if (fs !== null) return fs;
       if (buf.length < 10) return null;
-      const d = [];
-      for (let i = 1; i < buf.length; i++) if (buf[i].t > buf[i - 1].t) d.push(buf[i].t - buf[i - 1].t);
-      if (!d.length) return null;
-      d.sort((a, b) => a - b);
-      fs = 1000 / d[Math.floor(d.length / 2)];
+      // span-based: (n-1)/total-time. Median-of-deltas breaks when the clock
+      // jitters or repeats ticks (dataset log_time ticks ~3ms between 100Hz
+      // rows → median delta gave 324 Hz instead of 100).
+      const span = buf[buf.length - 1].t - buf[0].t;
+      if (!(span > 0)) return null;
+      fs = 1000 * (buf.length - 1) / span;
       bufMax = Math.round(winSecs * fs * 1.3);
       return fs;
     }

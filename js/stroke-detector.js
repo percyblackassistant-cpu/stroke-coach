@@ -20,16 +20,14 @@
     return out;
   }
 
-  // Sample rate (Hz) from [{t,...}] timestamps in ms (median delta).
+  // Sample rate (Hz) from [{t,...}] timestamps in ms — span-based: (n-1)/total.
+  // Median-of-deltas breaks on jittery/repeating clocks (dataset log_time ticks
+  // ~3ms between 100Hz rows → 324 Hz instead of 100; found validating v5).
   function sampleRate(samples) {
-    const dts = [];
-    for (let i = 1; i < samples.length; i++) {
-      const d = samples[i].t - samples[i - 1].t;
-      if (d > 0) dts.push(d);
-    }
-    if (dts.length < 10) return null;
-    dts.sort((a, b) => a - b);
-    const fs = 1000 / dts[Math.floor(dts.length / 2)];
+    if (!samples || samples.length < 10) return null;
+    const span = samples[samples.length - 1].t - samples[0].t;
+    if (!(span > 0)) return null;
+    const fs = 1000 * (samples.length - 1) / span;
     return isFinite(fs) && fs > 0 ? fs : null;
   }
 
