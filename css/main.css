@@ -1,0 +1,17 @@
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #0b0f14; color: #e8edf2; font-family: system-ui, sans-serif; }
+main { max-width: 480px; margin: 0 auto; padding: 12px env(safe-area-inset-right) calc(20px + env(safe-area-inset-bottom)); }
+button.primary { font-size: 28px; padding: 18px 48px; border-radius: 12px; border: none; background: #1652f0; color: white; width: 100%; }
+#stopBtn { margin-top: 8px; width: 100%; padding: 14px; font-size: 20px; border-radius: 10px; background: #c0392b; color: white; border: none; }
+button#exportBtn, #clearBtn { width: 100%; padding: 10px; margin-top: 8px; }
+.big { font-size: 15vw; text-align: center; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.big .unit { font-size: 5vw; color: #8fa3b0; }
+.metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0; }
+.metrics div { background: #131b23; border-radius: 8px; padding: 8px 4px; text-align: center; }
+.metrics span { font-size: 17px; font-variant-numeric: tabular-nums; display: block; }
+.metrics label { font-size: 10px; color: #8fa3b0; }
+#scope { width: 100%; height: 120px; background: #0e151c; border-radius: 8px; }
+h2 { font-size: 16px; }
+#sessionList { padding-left: 0; list-style: none; }
+#sessionList li { background: #131b23; padding: 8px; border-radius: 6px; margin-bottom: 6px; font-size: 13px; }

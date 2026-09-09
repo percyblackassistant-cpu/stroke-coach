@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Stroke Coach</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <main>
+    <button id="startBtn" class="primary">START</button>
+
+    <section id="dashboard" hidden>
+      <div class="big" id="speed">--<span class="unit"> km/h</span></div>
+      <div class="big" id="spm">--<span class="unit"> spm</span></div>
+      <div class="metrics">
+        <div><span id="pace">--:--</span><label>pace /500m</label></div>
+        <div><span id="dist">0</span><label>distance m</label></div>
+        <div><span id="elapsed">0:00</span><label>elapsed</label></div>
+        <div><span id="gps">no fix</span><label>gps</label></div>
+      </div>
+      <canvas id="scope" width="320" height="120"></canvas>
+      <button id="stopBtn">STOP &amp; SAVE</button>
+    </section>
+
+    <section id="history" hidden>
+      <h2>Sessions</h2>
+      <ul id="sessionList"></ul>
+      <button id="clearBtn">Clear history</button>
+    </section>
+
+    <section id="devtools">
+      <button id="exportBtn" hidden>Export raw CSV</button>
+    </section>
+  </main>
+  <script src="js/stroke-detector.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
