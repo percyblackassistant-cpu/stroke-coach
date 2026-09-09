@@ -129,12 +129,42 @@
     const secs = samples.length / fs;
     const full = estimateOne(mags, fs, opts);
 
+    // split-half consistency helper: a true stroke tone produces strong,
+    // agreeing peaks in BOTH halves; white noise (sd ≥ 0.3) picks independent
+    // random peaks with low spectral ratio — 64% of no-rowing windows passed
+    // path 2 before this gate (stress suite). Ratio floor must stay LOW
+    // enough to keep real-water windows (Moore-2019 ratios measured 2.6-17.6
+    // on 60s decimated windows; ~8 is the compromise, verified both suites).
+    // Returns true/false; null when halves too short to judge (short buffers
+    // must still work via path 2).
+    function halvesAgree() {
+      const halfN = Math.floor(samples.length / 2);
+      if (halfN < (opts.splitMinSamples ?? 600)) {
+        // halves too short for meaningful spectral ratios (short buffers):
+        // fall back to the full-window ratio, which is the reliable noise
+        // discriminator — white noise reads ~3, true tones read 50+ (a 20s
+        // HALF can hit ratio 34 on chance peaks; the full window can't)
+        return full.ratio >= (opts.fullRatioFloor ?? 12);
+      }
+      const h1 = estimateOne(mags.slice(0, halfN), fs, opts);
+      const h2 = estimateOne(mags.slice(samples.length - halfN), fs, opts);
+      if (!h1 || !h2) return null;
+      const floor = opts.splitRatioFloor ?? 8;
+      const tol = opts.splitTol ?? 3.5;
+      const halvesOk = h1.ratio >= floor && h2.ratio >= floor &&
+             Math.abs(h1.spm - h2.spm) <= tol;
+      // white-noise chance peaks can fool both halves; the full-window ratio
+      // (peak vs band median) separates them decisively
+      return halvesOk && full.ratio >= (opts.fullRatioFloor ?? 12);
+    }
+
     // confidence path 1: quarter-window agreement. Only meaningful when each
-    // quarter contains ≥ ~2.5 strokes: at 45 spm a 4 s window is 3 cycles;
-    // shorter quarters have hopeless frequency resolution (~40 spm at 1.5 s)
-    // and the cluster gate would reject everything (found on 6 s synth).
-    const qSecs = opts.quarterSecs ?? 4;
-    if (secs >= 4 * qSecs) {
+    // quarter contains ≥ ~3 strokes: at 16 spm a 20 s window's quarters have
+    // 1.3 cycles each — per-quarter readings are garbage and the cluster gate
+    // locks onto noise (read 14 for true 16 across ALL variants — found by the
+    // stress suite). Gate on cycles-per-quarter using the full-window estimate.
+    const qSecs = full ? (opts.quarterCycles ?? 3) * 60 / Math.max(full.spm, 1) : 0;
+    if (full && secs >= 4 * qSecs) {
       const qMin = Math.max(30, Math.round(qSecs * fs));
       const q = [];
       for (let k = 0; k < 4; k++) {
@@ -146,13 +176,18 @@
         }
       }
       const cluster = stableCluster(q, opts.clusterTol ?? 2.5);
-      if (cluster != null) return Math.round(cluster);
+      if (cluster != null && halvesAgree() !== false) return Math.round(cluster);
     }
 
     // confidence path 2: prominent full-window peak (rate drifted mid-window
-    // so quarters disagree, but the spectrum is clear at one frequency)
+    // so quarters disagree, but the spectrum is clear at one frequency).
+    // Gated on split-half agreement when the halves are long enough to judge
+    // (null = too short → allow, preserving short-buffer start-up behavior).
     if (full && full.ratio >= (opts.ratioFallback ?? 3)) {
-      return Math.round(full.spm);
+      const agree = halvesAgree();
+      if (agree !== false) {
+        return Math.round(full.spm * 10) / 10;
+      }
     }
 
     return null;
