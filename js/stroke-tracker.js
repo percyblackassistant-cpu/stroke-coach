@@ -34,7 +34,7 @@
     const maxOmegaStep = opts.maxOmegaStep ?? 0.05;
     const validatorAlpha = opts.validatorAlpha ?? 0.4; // omega EMA toward spectral reading
     const dispTauMs = opts.dispTauMs ?? 3000;  // display SPM EMA — final anti-jitter layer
-    const detectorOpts = opts.detectorOpts ?? {};
+    const detectorOpts = Object.assign({ spmStep: 0.1 }, opts.detectorOpts ?? {});
 
     let buf = [];                    // {t, mag, s|null}
     let fs = null, bufMax = 1500;

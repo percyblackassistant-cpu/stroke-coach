@@ -61,6 +61,19 @@
     }
     if (bestSpm < 0) return null;
 
+    // sub-step refinement: parabolic interpolation on log-power around the
+    // peak. A 20s window has ~3 spm raw bin width — interpolation gets the
+    // peak location to ~0.2 spm on a clean tone (needed for ±1 spm scoring).
+    const idx = Math.round((bestSpm - spmMin) / spmStep);
+    let refined = bestSpm;
+    if (idx > 0 && idx < powers.length - 1) {
+      const p0 = Math.log(powers[idx - 1] + 1e-30);
+      const p1 = Math.log(powers[idx] + 1e-30);
+      const p2 = Math.log(powers[idx + 1] + 1e-30);
+      const denom = p0 - 2 * p1 + p2;
+      if (denom < 0) refined = bestSpm + 0.5 * spmStep * (p0 - p2) / denom;
+    }
+
     // harmonic folding: catch subharmonic picks (12 shown for real 24).
     // Down-folding (44→22) was tried and REVERTED: it collided with the
     // up-fold on 092004 (read 12 instead of 24) and lost a trial net.
@@ -81,7 +94,7 @@
     const sorted = [...powers].sort((a, b) => a - b);
     const med = sorted[Math.floor(sorted.length / 2)];
     if (med <= 0) return null;
-    return { spm: bestSpm, ratio: bestP / med };
+    return { spm: Math.round(refined * 10) / 10, ratio: bestP / med };
   }
 
   // Largest cluster (pairwise spread ≤ tol) of quarter peaks; the rowing
