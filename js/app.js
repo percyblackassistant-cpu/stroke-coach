@@ -96,7 +96,10 @@ function tick() {
       $('spm').firstChild.textContent = state.lastSpmShown;
     } else {
       state.lastSpmShown = null;
-      $('spm').firstChild.textContent = '--';
+      // warm-up feedback (Bence 09-10: 'no result' — the app is collecting,
+      // it just needs ~10-20 s before it can lock; a blank '--' hides that)
+      const elapsed = Date.now() - state.startT;
+      $('spm').firstChild.textContent = elapsed < 22000 ? 'warming…' : '--';
     }
   }
   // SCREEN-STATE CSV LINES (Bence 09-10): record exactly what the UI displays,
