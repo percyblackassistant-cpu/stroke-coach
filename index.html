@@ -2,13 +2,27 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="color-scheme" content="dark">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Stroke Coach</title>
-<link rel="manifest" href="manifest.webmanifest?v=20260910172118
-<link rel="stylesheet" href="css/main.css?v=20260910172118
+<link rel="manifest" href="manifest.webmanifest?v=20260910174331">
+<link rel="stylesheet" href="css/main.css?v=20260910174331">
+<style>
+/* CRITICAL INLINE CSS — ships separately from main.css so a failed/missing
+   stylesheet fetch can never render the app as a broken white page
+   (Bence's Firefox Android screenshot, 09-10). main.css overrides everything. */
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #0b0f14; color: #e8edf2;
+  font-family: system-ui, sans-serif; }
+main { max-width: 560px; margin: 0 auto;
+  padding: 12px env(safe-area-inset-right) calc(20px + env(safe-area-inset-bottom)); }
+button.primary { font-size: 28px; padding: 18px 48px; border-radius: 12px;
+  border: none; background: #1652f0; color: white; width: 100%; }
+</style>
 </head>
 <body>
   <main>
@@ -38,8 +52,8 @@
       <button id="exportBtn" hidden>Export raw CSV</button>
     </section>
   </main>
-  <script src="js/stroke-detector.js?v=20260910172118"></script>
-<script src="js/stroke-tracker.js?v=20260910172118"></script>
-<script src="js/app.js?v=20260910172118"></script>
+  <script src="js/stroke-detector.js?v=20260910174331"></script>
+<script src="js/stroke-tracker.js?v=20260910174331"></script>
+<script src="js/app.js?v=20260910174331"></script>
 </body>
 </html>
