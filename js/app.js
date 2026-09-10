@@ -11,7 +11,8 @@ const state = {
   motionActive: false,
   gpsSpeed: null,
   lastSpmShown: null,
-  lastSpmAt: 0,  // m/s, latest good GPS fix
+  lastSpmAt: 0,
+  lastScreenLog: 0,  // last screen-state CSV line timestamp
   tracker: null,   // StrokeTracker (v5 PLL)
 };
 
@@ -101,6 +102,18 @@ function tick() {
       $('spm').firstChild.textContent = '--';
     }
   }
+  // SCREEN-STATE CSV LINES (Bence 09-10): record exactly what the UI displays,
+  // 1 Hz, so an export shows screen behaviour without a witness.
+  if (Date.now() - state.lastScreenLog >= 1000) {
+    state.lastScreenLog = Date.now();
+    const sState = state.tracker.state();
+    state.csvLog.push('S,' + Date.now() + ',' +
+      ($('spm').firstChild.textContent || '').trim() + ',' +
+      (sState.locked ? 1 : 0) + ',' +
+      (sState.spm == null ? '' : sState.spm) + ',' +
+      $('gps').textContent.trim() + ',' +
+      state.samples.length);
+  }
   const el = Math.floor((Date.now() - state.startT) / 1000);
   $('elapsed').textContent = `${Math.floor(el / 60)}:${String(el % 60).padStart(2, '0')}`;
   drawScope();
@@ -172,6 +185,13 @@ function stop() {
 }
 
 function saveSession() {
+  // final screen-state line (Bence 09-10): freeze last displayed value into export
+  state.csvLog.push('S,' + Date.now() + ',' +
+    ($('spm').firstChild.textContent || '').trim() + ',' +
+    (state.tracker && state.tracker.state().locked ? 1 : 0) + ',' +
+    (state.tracker && state.tracker.state().spm == null ? '' : state.tracker.state().spm) + ',' +
+    $('gps').textContent.trim() + ',' +
+    state.samples.length);
   const sessions = JSON.parse(localStorage.getItem('sc_sessions') || '[]');
   sessions.unshift({
     date: new Date().toISOString(),
@@ -190,7 +210,8 @@ function renderHistory() {
 }
 
 function exportCsv() {
-  const blob = new Blob([state.csvLog.join('\n') + '\n'], { type: 'text/csv' });
+  const header = 'HEADER,columns:M=ms,ax,ay,az|G=ms,lat,lon,speed,acc,heading|S=ms,shown_spm,locked,tracker_spm,gps_label,sample_buf';
+  const blob = new Blob([header + '\n' + state.csvLog.join('\n') + '\n'], { type: 'text/csv' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `stroke-coach-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
