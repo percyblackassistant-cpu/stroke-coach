@@ -27,3 +27,8 @@ jobs:
           path: '.'
       - id: deployment
         uses: actions/deploy-pages@v4
+      - name: Post-deploy live smoke test (renders correctly?)
+        run: |
+          npm install --no-save playwright
+          npx playwright install chromium || true
+          node tests/smoke-live.js
