@@ -41,7 +41,8 @@ function onMotion(e) {
   const t = (typeof window.__scTOverride === 'function') ? window.__scTOverride() : Date.now();
   const sample = { t, ax: a.x, ay: a.y, az: a.z };
   state.samples.push(sample);
-  if (state.samples.length > 2000) state.samples.shift();
+  // cap must exceed winSecs*fs for the tracker's 12s+ acquire window: 200Hz // devices deliver 2400+ samples in 12s
+    if (state.samples.length > 6000) state.samples.shift();
   state.csvLog.push(
     `M,${Date.now()},${a.x.toFixed(3)},${a.y.toFixed(3)},${a.z.toFixed(3)}`);
   if (state.csvLog.length > 30000) state.csvLog.splice(0, 3000);
