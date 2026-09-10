@@ -26,21 +26,7 @@ jobs:
         if: always()
         run: |
           echo "=== Accuracy Monitor ==="
-          if [ -f /tmp/test-accuracy.json ]; then
-            node -e \"
-            const d = require('/tmp/test-accuracy.json');
-            let tp = 0, tt = 0;
-            for (const [k, v] of Object.entries(d)) {
-              console.log(`  ${k.padEnd(20)} ${v.pass}/${v.total} = ${v.pct}%  (gate: ${v.gate || ''})`);
-              tp += v.pass; tt += v.total;
-            }
-            if (tt) console.log(`  TOTAL ${tp}/${tt} = ${(100*tp/tt).toFixed(1)}%`);
-          "
-          else
-            echo "(accuracy monitor output missing — suites may have crashed early)"
-            tail -40 /tmp/test-output.log
-            exit 1
-          fi
+          node tests/report-accuracy.cjs
       - name: Browser e2e (mock study data → HTML check)
         run: |
           # study CSV lives outside the repo; e2e skips gracefully if absent
