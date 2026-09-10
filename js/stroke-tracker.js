@@ -59,6 +59,25 @@
       const span = buf[buf.length - 1].t - buf[0].t;
       if (!(span > 0)) return null;
       fs = 1000 * (buf.length - 1) / span;
+      // sanity: a seconds-scale clock (Safari e.timeStamp quirk) yields absurd
+      // fs; fall back to median positive delta before giving up
+      if (fs > 250 || fs < 2) {
+        const d = [];
+        for (let i = 1; i < buf.length; i++) {
+          const dt = buf[i].t - buf[i - 1].t;
+          if (dt > 0) d.push(dt);
+        }
+        if (d.length < 5) return null;
+        d.sort((a, b) => a - b);
+        const med = d[Math.floor(d.length / 2)];
+        // deltas carry the same unit bug as the span — infer unit from
+        // magnitude: sub-2 values are seconds-scale (rate = 1/med), 2-1000
+        // are milliseconds (rate = 1000/med)
+        if (med > 0 && med < 2) fs = 1 / med;
+        else if (med >= 2 && med <= 1000) fs = 1000 / med;
+        else fs = null;
+        if (fs === null || fs > 250 || fs < 2) { fs = null; return null; }
+      }
       bufMax = Math.round(winSecs * fs * 1.3);
       return fs;
     }

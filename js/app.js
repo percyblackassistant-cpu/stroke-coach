@@ -28,7 +28,10 @@ async function initMotion() {
 function onMotion(e) {
   const a = e.accelerationIncludingGravity;
   if (!a || a.x == null) return;
-  const t = e.timeStamp;
+  // Safari may report e.timeStamp in SECONDS (platform quirk) — a seconds-scale
+  // clock made fs estimate explode and the tracker never acquired ('--' on
+  // Maria's iPhone, 09-10). Date.now() is guaranteed ms and monotonic here.
+  const t = Date.now();
   const sample = { t, ax: a.x, ay: a.y, az: a.z };
   state.samples.push(sample);
   if (state.samples.length > 2000) state.samples.shift();
