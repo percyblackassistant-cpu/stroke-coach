@@ -1,7 +1,15 @@
 :root { color-scheme: dark; }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: #0b0f14; color: #e8edf2; font-family: system-ui, sans-serif; }
-main { max-width: 480px; margin: 0 auto; padding: 12px env(safe-area-inset-right) calc(20px + env(safe-area-inset-bottom)); }
+main { max-width: 560px; margin: 0 auto; padding: 12px env(safe-area-inset-right) calc(20px + env(safe-area-inset-bottom)); }
+@media (orientation: landscape) {
+  main { max-width: none; padding: 8px calc(16px + env(safe-area-inset-right)) 8px calc(16px + env(safe-area-inset-left)); }
+  .big { font-size: 12vh; }
+  .big .unit { font-size: 4vh; }
+  .metrics { grid-template-columns: repeat(8, 1fr); }
+  #scope, #curve { height: 28vh; }
+  html, body { height: 100%; }
+}
 button.primary { font-size: 28px; padding: 18px 48px; border-radius: 12px; border: none; background: #1652f0; color: white; width: 100%; }
 #stopBtn { margin-top: 8px; width: 100%; padding: 14px; font-size: 20px; border-radius: 10px; background: #c0392b; color: white; border: none; }
 button#exportBtn, #clearBtn { width: 100%; padding: 10px; margin-top: 8px; }
