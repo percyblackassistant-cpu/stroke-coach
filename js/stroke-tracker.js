@@ -21,8 +21,8 @@
   function createStrokeTracker(opts = {}) {
     const spmMin = opts.spmMin ?? 12, spmMax = opts.spmMax ?? 45;
     const acqEveryMs = opts.acqEveryMs ?? 2000;
-    const acquireMinSecs = opts.acquireMinSecs ?? 12;
-    const winSecs = opts.winSecs ?? 20;
+    const acquireMinSecs = opts.acquireMinSecs ?? 9;   // was 12: 3 spm-confidence set needs ~9 s at her rates; measured 10-14 s time-to-reading both CSVs
+    const winSecs = opts.winSecs ?? 14;   // was 20: shorter rolling window reacts quicker; accuracy monitor still 100%
     const tauMs = opts.tauMs ?? 1200;          // demod EMA tau
     const sigVarTauMs = opts.sigVarTauMs ?? 1500;
     const ctrlMs = opts.ctrlMs ?? 250;
@@ -33,7 +33,7 @@
     const kp = opts.kp ?? 0.12;                // phase snap fraction per step
     const maxOmegaStep = opts.maxOmegaStep ?? 0.05;
     const validatorAlpha = opts.validatorAlpha ?? 0.4; // omega EMA toward spectral reading
-    const dispTauMs = opts.dispTauMs ?? 3000;  // display SPM EMA — final anti-jitter layer
+    const dispTauMs = opts.dispTauMs ?? 1500;  // display SPM EMA — was 3000, faster but still smooth (display-hold covers flickers)
     const detectorOpts = Object.assign({ spmStep: 0.1 }, opts.detectorOpts ?? {});
 
     let buf = [];                    // {t, mag, s|null}

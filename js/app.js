@@ -31,13 +31,9 @@ async function initMotion() {
 function onMotion(e) {
   const a = e.accelerationIncludingGravity;
   if (!a || a.x == null) return;
-  // Safari may report e.timeStamp in SECONDS (platform quirk) — a seconds-scale
-  // clock made fs estimate explode and the tracker never acquired ('--' on
-  // Maria's iPhone, 09-10). Date.now() is guaranteed ms and monotonic here.
-  // Sample clock: production uses Date.now() (Safari e.timeStamp can be
-  // seconds-scale — commit dd7b4e8). Tests set window.__scTOverride to
-  // supply exact monotonic ms timestamps so injected data replays at true
-  // device rate regardless of dispatch speed.
+  // Sample clock: Date.now() is guaranteed ms+monotonic (Safari's e.timeStamp
+  // can be seconds-scale — that's in dd7b4e8). Tests may set
+  // window.__scTOverride to replay data at exact device timing.
   const t = (typeof window.__scTOverride === 'function') ? window.__scTOverride() : Date.now();
   const sample = { t, ax: a.x, ay: a.y, az: a.z };
   state.samples.push(sample);
