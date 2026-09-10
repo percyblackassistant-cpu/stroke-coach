@@ -49,11 +49,11 @@ h2 { font-size: 16px; }
     align-content: center;
     padding: 8px calc(12px + env(safe-area-inset-right)) 8px calc(12px + env(safe-area-inset-left));
   }
-  #dashboard { grid-column: 1 / 3; display: grid; grid-template-columns: 1.15fr 1fr;
+  #dashboard { grid-column: 1 / 3; display: grid; grid-template-columns: 1.45fr 1fr;
     gap: 10px; height: 100%; min-height: 0; }
   #chartPanel { min-height: 0; }
   #statPanel { min-height: 0; align-content: space-between; }
-  #curve { height: 56vh; }
+  #curve { height: 46vh; }
   #scope { height: 15vh; }
   .card .num { font-size: 6.5vh; }
   .card .num.huge { font-size: 8.5vh; }
