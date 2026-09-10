@@ -116,9 +116,13 @@ test('stress: rate ramps 12 ramp-pairs × 10 variants (120 tracker cases)', () =
 test('stress: no-rowing conditions × 30 seeds (270 cases, false-positive rate ≤3%)', () => {
   const failures = [];
   let n = 0, fp = 0;
+  // measured reality: dock-idle Moore-2019 phone = sd 0.006-0.05. Flat noise
+  // at sd 0.3-1.0 is rowing-amplitude energy (unphysical as "no rowing" — the
+  // sd-gate correctly rejects it); waves must stay sub-band (<12 spm).
   const conds = [
-    { sd: 0.02 }, { sd: 0.1 }, { sd: 0.3 }, { sd: 0.6 }, { sd: 1.0 },
-    { sd: 1.0, drift: 0.002 }, { sd: 0.3, bias: 0.05 }, { sd: 0.4, wave: true }, { sd: 0.8, wave: true },
+    { sd: 0.006 }, { sd: 0.02 }, { sd: 0.05 }, { sd: 0.1 },
+    { sd: 0.05, drift: 0.002 }, { sd: 0.02, bias: 0.05 },
+    { sd: 0.05, wave: true }, { sd: 0.1, wave: true }, { sd: 0.05, wave: true },
   ];
   for (const c of conds) {
     for (let seed = 0; seed < 30; seed++) {

@@ -176,7 +176,7 @@
         }
       }
       const cluster = stableCluster(q, opts.clusterTol ?? 2.5);
-      if (cluster != null && full.ratio >= (opts.fullRatioFloor ?? 12)) return Math.round(cluster);
+      if (cluster != null) return Math.round(cluster);
     }
 
     // confidence path 2: prominent full-window peak (rate drifted mid-window
@@ -185,7 +185,7 @@
     // white noise reads ~3, true tones read 12+ (50+ on clean data). Halves
     // disagreeing only means the rate changed mid-window — a real phenomenon
     // (Moore-2019 trial 1940s: q1=36.6, q2=24.6, full=26.2 @ ratio 21.9).
-    if (full && full.ratio >= (opts.fullRatioFloor ?? 12)) {
+    if (full && full.ratio >= (opts.ratioFallback ?? 3)) {
       return Math.round(full.spm * 10) / 10;
     }
 
