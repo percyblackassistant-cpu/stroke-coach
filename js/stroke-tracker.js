@@ -167,33 +167,32 @@
       if (ax != null) {
         const vals = [ax, ay, az];
         nAx++;
-        const a = 2 / (Math.max(50, nAx) + 1);
+        // GRAVITY INVARIANCE (Bence, 09-10): the gravity vector is a CONSTANT
+        // of arbitrary orientation — we never know which axis it points down.
+        // So: estimate each axis mean cumulatively (optimal for a constant),
+        // subtract it, and select the axis by DEVIATION variance. A 45°-tilted
+        // phone spreads gravity over two axes; after DC removal only the
+        // stroke axis has real variance, wherever gravity points.
+        for (let k = 0; k < 3; k++) axisMeans[k] += (vals[k] - axisMeans[k]) / nAx;
+        const dev = [0, 0, 0];
+        for (let k = 0; k < 3; k++) dev[k] = vals[k] - axisMeans[k];
+        const dtAx = lastT === null ? 10 : Math.max(1, t - lastT);
+        const aAx = dtAx / (sigVarTauMs + dtAx);
         for (let k = 0; k < 3; k++) {
-          axisMeans[k] += a * (vals[k] - axisMeans[k]);
-          axisVars[k] += a * ((vals[k] - axisMeans[k]) ** 2 - axisVars[k]);
+          axisVars[k] += aAx * (dev[k] * dev[k] - axisVars[k]);
         }
         const fr = estimateFs();
-        // axis pick: EXCLUDE the gravity axis (|mean| >> 1 = pointing up/down).
-        // Its variance starts huge during EMA warm-up (gravity transient) and
-        // the first pick at 3s locked az forever — the real stroke axis (ay)
-        // never got the signed feed and acquisition starved (found by e2e).
-        if (fr && nAx > fr * 3 && axisIdx === null) {
-          const cands = [0, 1, 2].filter(k => Math.abs(axisMeans[k]) < 5);
-          if (cands.length) {
-            axisIdx = cands.reduce((a, b) => axisVars[a] >= axisVars[b] ? a : b);
-          }
+        // select at 5 s (cumulative means converged enough); one recheck at 15 s
+        if (fr && axisIdx === null && nAx > fr * 5) {
+          axisIdx = axisVars.indexOf(Math.max(...axisVars));
         }
-        // one re-evaluation at ~10 s, once: EMA vars are settled by then and
-        // an early wrong pick (transient) gets a second chance
-        if (fr && nAx > fr * 10 && !axisRechecked) {
+        if (fr && nAx > fr * 15 && !axisRechecked) {
           axisRechecked = true;
-          const cands = [0, 1, 2].filter(k => Math.abs(axisMeans[k]) < 5);
-          if (cands.length) {
-            const best = cands.reduce((a, b) => axisVars[a] >= axisVars[b] ? a : b);
-            if (best !== axisIdx) axisIdx = best;
-          }
+          const best = axisVars.indexOf(Math.max(...axisVars));
+          if (best !== axisIdx) axisIdx = best;
         }
-        if (axisIdx !== null) s = vals[axisIdx];
+        // signed feed = gravity-REMOVED dynamic acceleration
+        if (axisIdx !== null) s = dev[axisIdx];
         if (mag === null) mag = Math.sqrt(ax * ax + ay * ay + az * az);
       }
       const sig = (s != null ? s : mag);
