@@ -74,12 +74,20 @@
       if (denom < 0) refined = bestSpm + 0.5 * spmStep * (p0 - p2) / denom;
     }
 
-    // harmonic folding: catch subharmonic picks (12 shown for real 24).
-    // Down-folding (44→22) was tried and REVERTED: it collided with the
-    // up-fold on 092004 (read 12 instead of 24) and lost a trial net.
-    const foldK = opts.foldK ?? 0.35;
-    if (bestSpm < spmMax / 1.6 && 2 * bestSpm <= spmMax) {
-      const f = (2 * bestSpm) / 60;
+    // HARMONIC-SUM SCORING (HPS, 09-10): Maria's real-water session locked
+    // onto the 2nd harmonic (showed ~32-36 for a true ~17.9 — GPS-speed FFT
+    // ground truth; accel P(2f) can EXCEED P(f) because a stroke has TWO
+    // impulses: catch/drive + recovery check). So we don't pick the tallest
+    // peak: every scanned bin f is scored as
+    //   S(f) = P(f) + w2·P(2f) + w3·P(3f)
+    // summing its in-band harmonics. The true fundamental collects the energy
+    // of ALL its harmonics and wins; a 2f pick accumulates almost nothing
+    // (its own 2f is 4f_true, weak). W2<1 guarantees S(f) > S(f/2) whenever
+    // P(1.5f) is small, so no blind down-folding (the reverted 092004 bug).
+    const w2 = opts.hpsW2 ?? 0.9, w3 = opts.hpsW3 ?? 0.5;
+    function goertzelAt(spm) {
+      const f = spm / 60;
+      if (f <= 0 || f >= fs / 2) return 0;
       const w = 2 * Math.PI * f / fs;
       const coef = 2 * Math.cos(w);
       let s1 = 0, s2 = 0;
@@ -87,8 +95,27 @@
         const s0 = x[i] + coef * s1 - s2;
         s2 = s1; s1 = s0;
       }
-      const p2 = (s1 * s1 + s2 * s2 - coef * s1 * s2) / (n * n);
-      if (p2 >= foldK * bestP) bestSpm = 2 * bestSpm;
+      return (s1 * s1 + s2 * s2 - coef * s1 * s2) / (n * n);
+    }
+    let bestScore = -1, bestBase = bestSpm;
+    for (let i = 0; i < powers.length; i++) {
+      const f0 = spmMin + i * spmStep;
+      const p2f = 2 * f0 <= spmMax + 1e-9 ? goertzelAt(2 * f0) : 0;
+      const p3f = 3 * f0 <= spmMax + 1e-9 ? goertzelAt(3 * f0) : 0;
+      const score = powers[i] + w2 * p2f + w3 * p3f;
+      if (score > bestScore) { bestScore = score; bestBase = f0; }
+    }
+    bestSpm = bestBase; bestP = Math.max(bestP, powers[Math.round((bestSpm - spmMin) / spmStep)] ?? bestP);
+    {
+      const idx = Math.round((bestSpm - spmMin) / spmStep);
+      if (idx > 0 && idx < powers.length - 1) {
+        const p0 = Math.log(powers[idx - 1] + 1e-30);
+        const p1 = Math.log(powers[idx] + 1e-30);
+        const p2 = Math.log(powers[idx + 1] + 1e-30);
+        const denom = p0 - 2 * p1 + p2;
+        if (denom < 0) refined = bestSpm + 0.5 * spmStep * (p0 - p2) / denom;
+        else refined = bestSpm;
+      } else refined = bestSpm;
     }
 
     const sorted = [...powers].sort((a, b) => a - b);
