@@ -1,50 +1,67 @@
 :root { color-scheme: dark; }
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: #0b0f14; color: #e8edf2; font-family: system-ui, sans-serif; }
-main { max-width: 560px; margin: 0 auto; padding: 12px env(safe-area-inset-right) calc(20px + env(safe-area-inset-bottom)); }
-@media (orientation: landscape) {
-  main { max-width: none; padding: 8px calc(16px + env(safe-area-inset-right)) 8px calc(16px + env(safe-area-inset-left)); }
-  .big { font-size: 12vh; }
-  .big .unit { font-size: 4vh; }
-  .metrics { grid-template-columns: repeat(8, 1fr); }
-  #scope, #curve { height: 28vh; }
-  html, body { height: 100%; }
+html, body { margin: 0; padding: 0; background: #000; color: #e8edf2; font-family: system-ui, sans-serif; }
+main { max-width: 900px; margin: 0 auto; padding: 12px env(safe-area-inset-right) calc(20px + env(safe-area-inset-bottom)); }
+
+/* ---------- reference-UI design system (RP3-style, Maria 09-10) ---------- */
+#dashboard[hidden] { display: none !important; }
+#dashboard { display: grid; gap: 10px; }
+.card {
+  background: #161b20; border: 1px solid #262c33; border-radius: 10px;
+  padding: 10px 14px; text-align: center; min-width: 0;
 }
+.card label { display: block; font-size: 15px; color: #fff; margin-bottom: 2px; }
+.card .num { color: #29b6f6; font-size: 44px; line-height: 1.05;
+  font-variant-numeric: tabular-nums; font-weight: 500; display: block; }
+.card .num.huge { font-size: 56px; }
+.card .num.sm { font-size: 26px; }
+.card .unit { font-size: 40%; color: #29b6f6; }
+.card .num.txtMode { font-size: min(26px, 6.5vw); letter-spacing: 0.5px; }
+#spm.txtMode, #speed.txtMode { font-size: min(26px, 7vw) !important; }
+@media (orientation: landscape) { #spm.txtMode, #speed.txtMode { font-size: 5vh !important; } }
+#chartPanel { display: grid; gap: 8px; }
+.chartCard { padding: 10px 12px 6px; }
+.axisY { font-size: 13px; color: #9aa7b1; text-align: left; }
+.axisX { font-size: 13px; color: #9aa7b1; text-align: center; margin-top: 2px; }
+#curve { width: 100%; height: auto; display: block; background: transparent; }
+#scope { width: 100%; height: auto; display: block; background: #10151a;
+  border: 1px solid #262c33; border-radius: 10px; }
+#statPanel { display: grid; gap: 10px; }
+.cardRow2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.splitCard .num.huge .unit { font-size: 34%; }
+#stopBtn {
+  background: #161b20; border: 1px solid #3a2020; border-radius: 10px;
+  color: #ff5252; font-size: 18px; font-weight: 600; padding: 10px;
+}
+
 button.primary { font-size: 28px; padding: 18px 48px; border-radius: 12px; border: none; background: #1652f0; color: white; width: 100%; }
-#stopBtn { margin-top: 8px; width: 100%; padding: 14px; font-size: 20px; border-radius: 10px; background: #c0392b; color: white; border: none; }
 button#exportBtn, #clearBtn { width: 100%; padding: 10px; margin-top: 8px; }
-.big { font-size: 15vw; text-align: center; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.big .unit { font-size: 5vw; color: #8fa3b0; }
-.metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0; }
-.metrics div { background: #131b23; border-radius: 8px; padding: 8px 4px; text-align: center; }
-.metrics span { font-size: 17px; font-variant-numeric: tabular-nums; display: block; }
-.metrics label { font-size: 10px; color: #8fa3b0; }
-#scope { width: 100%; height: 120px; background: #0e151c; border-radius: 8px; }
-#curve { width: 100%; height: 100px; background: #0e151c; border-radius: 8px; margin-top: 6px; }
 h2 { font-size: 16px; }
 #sessionList { padding-left: 0; list-style: none; }
 #sessionList li { background: #131b23; padding: 8px; border-radius: 6px; margin-bottom: 6px; font-size: 13px; }
 
-/* ---------- landscape (boat mount, Maria 09-10): two-column, no scroll ---------- */
+/* ---------- landscape (boat mount): chart left, stat cards right, no scroll ---------- */
 @media (orientation: landscape) {
   html, body { height: 100%; overflow: hidden; }
-  body { display: flex; align-items: stretch; justify-content: center; }
   main {
-    max-width: none; width: 100%;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-auto-rows: min-content;
+    max-width: none; width: 100%; height: 100%;
+    display: grid; grid-template-columns: 1.15fr 1fr; gap: 10px;
     align-content: center;
-    padding: 6px calc(10px + env(safe-area-inset-right)) 6px calc(10px + env(safe-area-inset-left));
+    padding: 8px calc(12px + env(safe-area-inset-right)) 8px calc(12px + env(safe-area-inset-left));
   }
-  /* promote live widgets out of #dashboard into the main grid */
-  #dashboard { display: contents; }
-  #dashboard .big:first-child { grid-column: 1; grid-row: 1; font-size: 11vw; }
-  #dashboard #spm { grid-column: 2; grid-row: 1; font-size: 11vw; }
-  #dashboard .metrics { grid-column: 1 / 3; grid-row: 2; margin: 4px 0; }
-  #dashboard #scope { grid-column: 1; grid-row: 3; height: 16vh; }
-  #dashboard #curve { grid-column: 2; grid-row: 3; height: 16vh; }
-  #dashboard #stopBtn { grid-column: 1 / 3; grid-row: 4; margin-top: 6px; }
+  #dashboard { grid-column: 1 / 3; display: grid; grid-template-columns: 1.15fr 1fr;
+    gap: 10px; height: 100%; min-height: 0; }
+  #chartPanel { min-height: 0; }
+  #statPanel { min-height: 0; align-content: space-between; }
+  #curve { height: 56vh; }
+  #scope { height: 15vh; }
+  .card .num { font-size: 6.5vh; }
+  .card .num.huge { font-size: 8.5vh; }
+  .card .num.sm { font-size: 4vh; }
+  .cardRow2 { grid-template-columns: 1fr 1fr; }
   #startBtn { grid-column: 1 / 3; }
   #history, #devtools, h2, #sessionList { display: none; }
+}
+@media (orientation: portrait) {
+  #history, #devtools { display: block; }
 }

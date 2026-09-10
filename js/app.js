@@ -93,13 +93,13 @@ function tick() {
     // '--' and wipe a good number; '--' only once truly stale.
     if (s.spm != null) { state.lastSpmShown = s.spm.toFixed(1); state.lastSpmAt = Date.now(); }
     if (state.lastSpmShown && Date.now() - state.lastSpmAt < 4000) {
-      $('spm').firstChild.textContent = state.lastSpmShown;
+      setSpmDisplay(state.lastSpmShown);
     } else {
       state.lastSpmShown = null;
       // warm-up feedback (Bence 09-10: 'no result' — the app is collecting,
       // it just needs ~10-20 s before it can lock; a blank '--' hides that)
       const elapsed = Date.now() - state.startT;
-      $('spm').firstChild.textContent = elapsed < 22000 ? 'warming…' : '--';
+      setSpmDisplay(elapsed < 22000 ? 'warming…' : '--');
     }
   }
   // SCREEN-STATE CSV LINES (Bence 09-10): record exactly what the UI displays,
@@ -140,13 +140,19 @@ function drawScope() {
 }
 
 // erg-style drive curve (normalized shape, median of last ~8-12 strokes)
+function setSpmDisplay(v) {
+  const el = $('spm');
+  el.firstChild.textContent = v;
+  el.classList.toggle('txtMode', !/^[0-9.]+$/.test(String(v).trim()));
+}
+
 function drawCurve() {
   const c = $('curve'), ctx = c.getContext('2d');
   ctx.clearRect(0, 0, c.width, c.height);
   if (!state.tracker) return;
   const curve = state.tracker.driveCurve();
   if (!curve) return;
-  ctx.strokeStyle = '#2ecc71'; ctx.lineWidth = 2; ctx.beginPath();
+  ctx.strokeStyle = '#ffe14d'; ctx.lineWidth = 2; ctx.beginPath();
   curve.forEach((v, i) => {
     const x = i / (curve.length - 1) * c.width;
     const y = c.height / 2 - v * (c.height / 2 - 6);

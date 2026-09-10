@@ -8,8 +8,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Stroke Coach</title>
-<link rel="manifest" href="manifest.webmanifest?v=20260910175218">
-<link rel="stylesheet" href="css/main.css?v=20260910175218">
+<link rel="manifest" href="manifest.webmanifest?v=20260910201009">
+<link rel="stylesheet" href="css/main.css?v=20260910201009">
 <style>
 /* CRITICAL INLINE CSS — ships separately from main.css so a failed/missing
    stylesheet fetch can never render the app as a broken white page
@@ -29,17 +29,32 @@ button.primary { font-size: 28px; padding: 18px 48px; border-radius: 12px;
     <button id="startBtn" class="primary">START</button>
 
     <section id="dashboard" hidden>
-      <div class="big" id="speed">--<span class="unit"> km/h</span></div>
-      <div class="big" id="spm">--<span class="unit"> spm</span></div>
-      <div class="metrics">
-        <div><span id="pace">--:--</span><label>pace /500m</label></div>
-        <div><span id="dist">0</span><label>distance m</label></div>
-        <div><span id="elapsed">0:00</span><label>elapsed</label></div>
-        <div><span id="gps">no fix</span><label>gps</label></div>
+      <div id="chartPanel">
+        <div class="card chartCard">
+          <div class="axisY">Force</div>
+          <canvas id="curve" width="300" height="150"></canvas>
+          <div class="axisX">Stroke length</div>
+        </div>
+        <canvas id="scope" width="300" height="70"></canvas>
       </div>
-      <canvas id="scope" width="320" height="120"></canvas>
-      <canvas id="curve" width="320" height="100"></canvas>
-      <button id="stopBtn">STOP &amp; SAVE</button>
+      <div id="statPanel">
+        <div class="cardRow2">
+          <div class="card"><label>Time</label><span class="num" id="elapsed">0:00</span></div>
+          <div class="card"><label>Stroke rate</label><span class="num"><span id="spm">--</span><span class="unit">spm</span></span></div>
+        </div>
+        <div class="card splitCard">
+          <label>Split</label>
+          <span class="num huge"><span id="pace">--:--</span><span class="unit">/500m</span></span>
+        </div>
+        <div class="cardRow2">
+          <div class="card"><label>Distance</label><span class="num"><span id="dist">0</span><span class="unit">m</span></span></div>
+          <div class="card"><label>Speed</label><span class="num"><span id="speed">--</span><span class="unit">km/h</span></span></div>
+        </div>
+        <div class="cardRow2">
+          <div class="card"><label>GPS</label><span class="num sm" id="gps">no fix</span></div>
+          <button id="stopBtn">STOP &amp; SAVE</button>
+        </div>
+      </div>
     </section>
 
     <section id="history" hidden>
@@ -52,8 +67,8 @@ button.primary { font-size: 28px; padding: 18px 48px; border-radius: 12px;
       <button id="exportBtn" hidden>Export raw CSV</button>
     </section>
   </main>
-  <script src="js/stroke-detector.js?v=20260910175218"></script>
-<script src="js/stroke-tracker.js?v=20260910175218"></script>
-<script src="js/app.js?v=20260910175218"></script>
+  <script src="js/stroke-detector.js?v=20260910201009"></script>
+<script src="js/stroke-tracker.js?v=20260910201009"></script>
+<script src="js/app.js?v=20260910201009"></script>
 </body>
 </html>
