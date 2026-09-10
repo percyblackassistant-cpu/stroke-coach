@@ -320,7 +320,15 @@
       return last;
     }
 
+    // per-stroke curves for the UI: last N completed strokes, oldest first,
+    // each {curve, t} — lets the chart draw every stroke as its own line
+    // (Bence 09-10: "show each stroke on its own")
+    function strokeCurves(max) {
+      const done = strokes.filter(s => s.curve).slice(-max);
+      return done.map(s => ({ curve: s.curve, t: s.catchT }));
+    }
     return { update, process, state, driveCurve,
+             strokeCurves,
              debug: () => ({ fs, locked, omega, axisIdx, axes: axisVars.slice(), strokes: strokes.length, sigVar: sigVar.v, amp: 2 * Math.hypot(I, Q), exp: expectAmp() }) };
   }
 
