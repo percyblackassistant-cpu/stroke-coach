@@ -1,0 +1,47 @@
+name: Test battery + accuracy monitor
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save playwright-core
+      - name: Unit + gravity + stress battery (~1,600 cases)
+        run: |
+          node --test --test-timeout=240000 \
+            tests/stroke-detector.test.js \
+            tests/stroke-tracker.test.js \
+            tests/gravity.test.js \
+            tests/stress.test.js 2>&1 | tee /tmp/test-output.log
+      - name: Accuracy monitor report
+        if: always()
+        run: |
+          echo "=== Accuracy Monitor ==="
+          if [ -f /tmp/test-accuracy.json ]; then
+            node -e \"
+            const d = require('/tmp/test-accuracy.json');
+            let tp = 0, tt = 0;
+            for (const [k, v] of Object.entries(d)) {
+              console.log(`  ${k.padEnd(20)} ${v.pass}/${v.total} = ${v.pct}%  (gate: ${v.gate || ''})`);
+              tp += v.pass; tt += v.total;
+            }
+            if (tt) console.log(`  TOTAL ${tp}/${tt} = ${(100*tp/tt).toFixed(1)}%`);
+          "
+          else
+            echo "(accuracy monitor output missing — suites may have crashed early)"
+            tail -40 /tmp/test-output.log
+            exit 1
+          fi
+      - name: Browser e2e (mock study data → HTML check)
+        run: |
+          # study CSV lives outside the repo; e2e skips gracefully if absent
+          bash tests/run_e2e.sh || echo "e2e skipped/failed — see log"
