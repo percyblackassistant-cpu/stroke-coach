@@ -9,7 +9,9 @@ const state = {
   samples: [],     // motion ring buffer {t, ax, ay, az}
   csvLog: [],
   motionActive: false,
-  gpsSpeed: null,  // m/s, latest good GPS fix
+  gpsSpeed: null,
+  lastSpmShown: null,
+  lastSpmAt: 0,  // m/s, latest good GPS fix
   tracker: null,   // StrokeTracker (v5 PLL)
 };
 
@@ -31,7 +33,11 @@ function onMotion(e) {
   // Safari may report e.timeStamp in SECONDS (platform quirk) — a seconds-scale
   // clock made fs estimate explode and the tracker never acquired ('--' on
   // Maria's iPhone, 09-10). Date.now() is guaranteed ms and monotonic here.
-  const t = Date.now();
+  // Sample clock: production uses Date.now() (Safari e.timeStamp can be
+  // seconds-scale — commit dd7b4e8). Tests set window.__scTOverride to
+  // supply exact monotonic ms timestamps so injected data replays at true
+  // device rate regardless of dispatch speed.
+  const t = (typeof window.__scTOverride === 'function') ? window.__scTOverride() : Date.now();
   const sample = { t, ax: a.x, ay: a.y, az: a.z };
   state.samples.push(sample);
   if (state.samples.length > 2000) state.samples.shift();
@@ -84,8 +90,16 @@ function tick() {
   if (!state.running) return;
   if (state.tracker) {
     const s = state.tracker.state();
-    // smooth SPM with one decimal; '--' when unlocked (no confident rate)
-    $('spm').firstChild.textContent = s.spm != null ? s.spm.toFixed(1) : '--';
+    // DISPLAY HOLD (Maria/Bence 09-10): keep the last numeric reading on
+    // screen for 4 s after unlock so a brief tracking flicker doesn't flash
+    // '--' and wipe a good number; '--' only once truly stale.
+    if (s.spm != null) { state.lastSpmShown = s.spm.toFixed(1); state.lastSpmAt = Date.now(); }
+    if (state.lastSpmShown && Date.now() - state.lastSpmAt < 4000) {
+      $('spm').firstChild.textContent = state.lastSpmShown;
+    } else {
+      state.lastSpmShown = null;
+      $('spm').firstChild.textContent = '--';
+    }
   }
   const el = Math.floor((Date.now() - state.startT) / 1000);
   $('elapsed').textContent = `${Math.floor(el / 60)}:${String(el % 60).padStart(2, '0')}`;
