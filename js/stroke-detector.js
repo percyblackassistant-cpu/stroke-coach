@@ -176,18 +176,17 @@
         }
       }
       const cluster = stableCluster(q, opts.clusterTol ?? 2.5);
-      if (cluster != null && halvesAgree() !== false) return Math.round(cluster);
+      if (cluster != null && full.ratio >= (opts.fullRatioFloor ?? 12)) return Math.round(cluster);
     }
 
     // confidence path 2: prominent full-window peak (rate drifted mid-window
     // so quarters disagree, but the spectrum is clear at one frequency).
-    // Gated on split-half agreement when the halves are long enough to judge
-    // (null = too short → allow, preserving short-buffer start-up behavior).
-    if (full && full.ratio >= (opts.ratioFallback ?? 3)) {
-      const agree = halvesAgree();
-      if (agree !== false) {
-        return Math.round(full.spm * 10) / 10;
-      }
+    // The FULL-window spectral ratio is the decisive noise discriminator:
+    // white noise reads ~3, true tones read 12+ (50+ on clean data). Halves
+    // disagreeing only means the rate changed mid-window — a real phenomenon
+    // (Moore-2019 trial 1940s: q1=36.6, q2=24.6, full=26.2 @ ratio 21.9).
+    if (full && full.ratio >= (opts.fullRatioFloor ?? 12)) {
+      return Math.round(full.spm * 10) / 10;
     }
 
     return null;

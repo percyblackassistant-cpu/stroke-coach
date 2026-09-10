@@ -187,3 +187,6 @@ $('clearBtn').addEventListener('click', () => {
   localStorage.removeItem('sc_sessions'); renderHistory();
 });
 renderHistory();
+
+// testability hook (read-only usage by e2e tests) — must be AFTER state init
+window.__sc = state;

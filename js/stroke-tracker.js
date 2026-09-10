@@ -44,7 +44,7 @@
     let meanSig = 0, lastSig = null;
     const sigVar = { m: 0, v: 0 };
     let spm = null, spmDisp = null, lastT = null;
-    let axisVars = [0, 0, 0], axisMeans = [0, 0, 0], nAx = 0, axisIdx = null;
+    let axisVars = [0, 0, 0], axisMeans = [0, 0, 0], nAx = 0, axisIdx = null, axisRechecked = false;
     let lastN = -1;
     let strokes = [];                // {catchT, curve|null}
     const maxStrokes = opts.maxStrokes ?? 12;
@@ -173,8 +173,25 @@
           axisVars[k] += a * ((vals[k] - axisMeans[k]) ** 2 - axisVars[k]);
         }
         const fr = estimateFs();
+        // axis pick: EXCLUDE the gravity axis (|mean| >> 1 = pointing up/down).
+        // Its variance starts huge during EMA warm-up (gravity transient) and
+        // the first pick at 3s locked az forever — the real stroke axis (ay)
+        // never got the signed feed and acquisition starved (found by e2e).
         if (fr && nAx > fr * 3 && axisIdx === null) {
-          axisIdx = axisVars.indexOf(Math.max(...axisVars));
+          const cands = [0, 1, 2].filter(k => Math.abs(axisMeans[k]) < 5);
+          if (cands.length) {
+            axisIdx = cands.reduce((a, b) => axisVars[a] >= axisVars[b] ? a : b);
+          }
+        }
+        // one re-evaluation at ~10 s, once: EMA vars are settled by then and
+        // an early wrong pick (transient) gets a second chance
+        if (fr && nAx > fr * 10 && !axisRechecked) {
+          axisRechecked = true;
+          const cands = [0, 1, 2].filter(k => Math.abs(axisMeans[k]) < 5);
+          if (cands.length) {
+            const best = cands.reduce((a, b) => axisVars[a] >= axisVars[b] ? a : b);
+            if (best !== axisIdx) axisIdx = best;
+          }
         }
         if (axisIdx !== null) s = vals[axisIdx];
         if (mag === null) mag = Math.sqrt(ax * ax + ay * ay + az * az);
