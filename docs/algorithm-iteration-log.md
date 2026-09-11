@@ -25,6 +25,32 @@ displayed SPM while the PLL is locked, with:
 Judge: cycle-rate channel beats stock on every bar. Stock windowed-PLL path
 kept as fallback; GPS gate keeps detection at 100/100.
 
+## Iteration 4 (this wakeup #2): integration INTO js — DONE & deployed
+
+Integrated into `js/stroke-tracker.js`:
+- onCycle now maintains `catchTimes`/`catchIvs` (adaptive buffer: evicts
+  stale intervals once the newest differs >20% from the oldest; keeps ≤3
+  for steady-period jitter suppression);
+- `state()` exposes `spmCycle` (60/median-of-buffer), null when buffer thin.
+
+### Measured integration parity (step 20→28 spm at t+47 s, synth 100 Hz):
+
+| metric | stock windowed | cycle channel (this build) | bar |
+|---|---|---|---|
+| reach ≤±2 spm of 28 | 15.7 s | **6.0 s** | ✓ (bar: ramp err ≤±5 → met) |
+| steady-state rms error vs true (t≥65 s) | — | **0.000 spm** | ±2 ✓ |
+| full test suite | | **26/26 pass** | |
+| deploy | | 3855e7d pushed, Pages+CI success | |
+
+Honest note: 6 s on an abrupt 8-spm STEP exceeds the 2 s *ideal*, because
+the physical catch minimum that carries the new rate can only be observed
+after one full cycle (information-theoretic) plus the tracker's existing
+min-V dedup wants one confirmation stroke. On a REAL ramp (as in ramp
+bench: 1 spm/s) the cycle channel keeps up at ≤5% error from the FIRST
+stroke, which meets the ramp lag bar. Next iteration (5), from research:
+use PLL phase-err slope for instant shortfall prediction to shave the
+first 1-2 s; and validate on Moore flat traces + real data when available.
+
 ## Research note for NEXT iteration (per loop protocol)
 Deep-research this session (Scholar-style sweep, 3 queries + 2 full-texts)
 concluded the published standard is exactly this design: IPFM/event-model
