@@ -353,12 +353,47 @@
     // per-stroke curves for the UI: last N completed strokes, oldest first,
     // each {curve, t} — lets the chart draw every stroke as its own line
     // (Bence 09-10: "show each stroke on its own")
+    // live partial curve for the NEWEST stroke (Bence 09-11: "last stroke
+    // is not visible"): between the catch and catch+0.55T the stroke exists
+    // in strokes[] but buildCurves hasn't finished it, so the chart shows
+    // one stroke fewer. Expose the in-progress drive path (same 55% drive
+    // window, partial length) normalized to ±1 like the finished curves.
+    function strokeCurvesPartial(maxPts) {
+      if (axisIdx === null || !fs || omega <= 0) return null;
+      const st = strokes.find(s => s.curve === null);
+      if (!st) return null;
+      const T = 2 * Math.PI / omega * 1000;
+      const eT = st.catchT + 0.55 * T;
+      const i0 = findIdx(st.catchT);
+      if (i0 < 0) return null;
+      const now = buf.length ? buf[buf.length - 1].t : st.catchT;
+      const i1 = findIdx(Math.min(eT, now));
+      if (i1 < 0 || i1 - i0 < 4) return null;
+      const spanT = eT - st.catchT;
+      const pts = [];
+      let mx = 0;
+      const NPTS = maxPts || curveN;
+      for (let k = 0; k < NPTS; k++) {
+        const target = st.catchT + spanT * k / (NPTS - 1);
+        if (target > now) break;
+        const j = findIdx(target);
+        if (j < 0) continue;
+        pts.push(buf[j].s);
+        const v = Math.abs(buf[j].s);
+        if (v > mx) mx = v;
+      }
+      if (pts.length < 4) return null;
+      mx = mx || 1;
+      return { curve: pts.map(v => Math.round(v / mx * 1000) / 1000), catchT: st.catchT, partial: true, progress: pts.length / NPTS };
+    }
+
     function strokeCurves(max) {
       const done = strokes.filter(s => s.curve).slice(-max);
       return done.map(s => ({ curve: s.curve, t: s.catchT }));
     }
     return { update, process, state, driveCurve,
              strokeCurves,
+             strokeCurvesPartial,
              debug: () => ({ fs, locked, omega, axisIdx, axes: axisVars.slice(), strokes: strokes.length, sigVar: sigVar.v, amp: 2 * Math.hypot(I, Q), exp: expectAmp() }) };
   }
 

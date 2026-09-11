@@ -156,7 +156,14 @@ function drawCurve() {
   if (curves && curves.length) {
     // shared height scale: normalize each curve by its own max keeps classic erg
     // look; shared max keeps relative force honest. Use shared max.
-    const mx = Math.max(...curves.flatMap(s => s.curve.map(v => Math.abs(v))), 0.01);
+  // LIVE partial path for the in-progress stroke (Bence 09-11: the last
+  // stroke must be visible while it's being pulled, not only after completion)
+  let partial = null;
+  try { partial = state.tracker.strokeCurvesPartial ? state.tracker.strokeCurvesPartial(64) : null; } catch { partial = null; }
+  const mx = Math.max(
+    ...curves.flatMap(s => s.curve.map(v => Math.abs(v))),
+    ...(partial ? partial.curve.map(v => Math.abs(v)) : [0]),
+    0.01);
     curves.forEach((s, ci) => {
       const alpha = 0.25 + 0.75 * (ci + 1) / curves.length;
       ctx.strokeStyle = `rgba(255, 225, 77, ${alpha.toFixed(2)})`;
@@ -169,6 +176,18 @@ function drawCurve() {
       });
       ctx.stroke();
     });
+    // the live stroke drawn last, on top, full brightness
+    if (partial && partial.curve.length > 3) {
+      ctx.strokeStyle = 'rgba(255, 240, 140, 0.95)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      partial.curve.forEach((v, i) => {
+        const x = i / (partial.curve.length - 1) * c.width;
+        const y = c.height - 6 - (v / mx) * (c.height - 16);
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      });
+      ctx.stroke();
+    }
     return;
   }
   // fallback until 3 strokes complete: median blend (old behavior)
