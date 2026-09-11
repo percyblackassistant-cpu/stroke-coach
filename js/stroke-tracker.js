@@ -47,6 +47,9 @@
     let axisVars = [0, 0, 0], axisMeans = [0, 0, 0], nAx = 0, axisIdx = null, axisRechecked = false;
     let lastN = -1;
     let strokes = [];                // {catchT, curve|null}
+    let catchTimes = [];             // recent catch timestamps (ms) — cycle-rate channel
+    let catchIvs = [];               // recent valid catch intervals (s), 30%-vetoed
+    let prevIv = null;               // previous interval (flush-rule memory)
     const maxStrokes = opts.maxStrokes ?? 12;
     const curveN = opts.curveN ?? 64;
 
@@ -147,6 +150,24 @@
       if (strokes.length && Math.abs(strokes[0].catchT - minT) < 0.35 * T) return;
       strokes.unshift({ catchT: minT, curve: null });
       if (strokes.length > maxStrokes) strokes.pop();
+      // per-stroke cycle-rate channel (iter1-3 bench, docs/algorithm-iteration-log.md):
+      // event-based rate = 60/interval of consecutive catches, with a 30%
+      // Kubios/Citi-style outlier veto vs the running 5-window median.
+      // Display path (app.js) prefers this omega-independent readout: it
+      // reaches a true rate change ONE stroke after it happens, where the
+      // windowed spectrum needs 10-17 s.
+      const iv = catchTimes.length ? (minT - catchTimes[catchTimes.length - 1]) / 1000 : null;
+      if (iv != null && iv > 0.8 && iv < 8) {   // 7.5-75 spm plausibility
+        // adaptive buffer (iter4b): keep intervals while the oldest member is
+        // within 20% of the newest — a rate jump evicts stale history in one
+        // step, so the display reads a NEW rate within one catch (~2 s lag),
+        // while steady rowing keeps the 3-window median for low jitter.
+        catchIvs.push(iv);
+        while (catchIvs.length > 1 && Math.abs(iv - catchIvs[0]) / Math.max(iv, catchIvs[0], 0.001) > 0.20) catchIvs.shift();
+        if (catchIvs.length > 3) catchIvs.shift();
+      }
+      catchTimes.push(minT);
+      if (catchTimes.length > 8) catchTimes.shift();
     }
 
     function findIdx(tt) {
@@ -295,7 +316,16 @@
       const ph = locked && omega > 0
         ? (((thetaAbs % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) / (2 * Math.PI)
         : null;
-      return { locked, spm: spmDisp === null ? null : Math.round(spmDisp * 10) / 10, phase: ph };
+      // Cycle-rate channel: 60 / median of recent 30%-vetoed catch intervals.
+      // Fresh only if the last catch is within 3 s (else fishy → null → app
+      // falls back to the windowed spm / '--' path).
+      let spmCycle = null;
+      if (catchIvs.length >= 2 && catchTimes.length) {
+        const now = catchTimes[catchTimes.length - 1];
+        const med = [...catchIvs].sort((a, b) => a - b)[Math.floor(catchIvs.length / 2)];
+        spmCycle = Math.round(60 / med * 10) / 10;
+      }
+      return { locked, spm: spmDisp === null ? null : Math.round(spmDisp * 10) / 10, phase: ph, spmCycle };
     }
 
     function driveCurve() {
