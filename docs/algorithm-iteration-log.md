@@ -131,6 +131,10 @@ real-water rowing (varying stroke shape) defeats the veto.
   test suite, push, then re-run Moore-trace bench on real data.
 
 Goal: **NOT COMPLETE yet** (integration pending). Continue loop.
+
+*(Status above was iteration-3's snapshot; iterations 4-6 below supersede
+it — integration landed at 3855e7d and the revised bars were accepted at
+iteration 6.)*
 # Decision note — display precision ±0.1 spm (loop wake 5, iteration 7)
 
 **Bence's ask:** tighten the algorithm bar from ±1 spm to **±0.1 spm**.
