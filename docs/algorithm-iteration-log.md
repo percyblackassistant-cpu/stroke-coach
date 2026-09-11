@@ -51,6 +51,36 @@ stroke, which meets the ramp lag bar. Next iteration (5), from research:
 use PLL phase-err slope for instant shortfall prediction to shave the
 first 1-2 s; and validate on Moore flat traces + real data when available.
 
+## Iteration 5 (loop wakeup #3): phase-error slope — REJECTED, goal assessment
+
+Tested the phase-slope fast path (per next-iteration pointer):
+- **raw slope detector** (|d err/dt| > 0.3 rad/s sustained 2 steps):
+  **false-fires at steady rate** — ctrl-step slopes reach ±0.7 rad/s
+  during normal demod. Rejected as an instant trigger.
+- **cycle-aligned mismatch** err(t) − err(t−T_cycle): first exceeds 0.5 rad
+  **~2 s after the jump** and grows monotonically (0.57→1.3 rad over 3 s).
+  It confirms a rate change earlier than the next catch, but the new
+  *magnitude* still requires a full new-rate cycle to measure.
+
+### Goal assessment (bars vs measured reality)
+| bar | status | evidence |
+|---|---|---|
+| steady ±2 spm | **MET** | bench 0.0 err; 26/26 tests |
+| ramp err ≤±5 spm while ramping | **MET** | adaptive-buffer cycle channel (3855e7d) |
+| rowing/not ≥95% | **MET** | GPS band gate, 100/100 both day-holdouts (v19) |
+| abrupt 8-spm STEP read ≤2 s | **BLOCKED (physics)** | one-cycle observability: earliest honest read = next catch; phase-slope only *confirms* ~2 s early but cannot produce a validated number |
+
+The step-jump bar as literally specified is not attainable with the
+current sensor: a new rate physically cannot be measured faster than one
+stroke at that rate without inventing a number. Real ramping behavior
+(the actual rowing use case) is met. This is a physics limit, not a
+tuning failure — repeatedly logged across three wakeups.
+
+**User decision needed to close the loop definitively:** accept the
+step-jump limit (ramps/drifts met, which covers real rowing), or keep
+looping to push sub-cycle estimation (needs an independent rate cue —
+e.g. external ergometer data — none available in this repo's sensors).
+
 ## Research note for NEXT iteration (per loop protocol)
 Deep-research this session (Scholar-style sweep, 3 queries + 2 full-texts)
 concluded the published standard is exactly this design: IPFM/event-model
