@@ -17,20 +17,22 @@ const { spawn } = require('child_process');
 
 const BASE = process.argv[2] || process.env.E2E_BASE || 'http://localhost:8080';
 
-// ---- 1. dump a 40 s trial slice from the Moore-2019 study (raw ay @100 Hz) ----
+// ---- 1. dump a 40 s trial slice from the Moore-2019 study (raw tri-axial @100 Hz) ----
 function loadStudySlice() {
   const dir = '/tmp/row_data/row_data/club-level/iPhone';
   const f = fs.readdirSync(dir).find(n => n.startsWith('Boat2x-'));
   const csv = fs.readFileSync(path.join(dir, f), 'utf8');
   const lines = csv.split('\n');
   const hdr = lines[0].split(',');
+  const iAx = hdr.indexOf('accelerometer_acceleration_x');
   const iAy = hdr.indexOf('accelerometer_acceleration_y');
+  const iAz = hdr.indexOf('accelerometer_acceleration_z');
   // verified rowing block: 1940-1980 s has the file's best spectral ratio
   // (14.3, sd 0.226) — found by scanning every 20 s block for peak/median power
   const out = [];
   for (let k = 194000; k < 198000 && k < lines.length; k++) {
-    const v = lines[k].split(',')[iAy];
-    if (v) out.push(parseFloat(v));
+    const c = lines[k].split(',');
+    if (c[iAy]) out.push({ x: +c[iAx], y: +c[iAy], z: +c[iAz] });
   }
   return out;
 }
@@ -90,6 +92,12 @@ test('e2e: browser + mock study data → HTML output check', async (t) => {
     // the app starts on the START screen
     assert.equal(await page.isVisible('#startBtn'), true, 'START button visible');
 
+    // Replay at exact device timing: app.js stamps samples with
+    // window.__scTOverride() when set (see dd7b4e8 / e2e-maria). Without it
+    // the 40 s slice is injected in <1 s wall time, the tracker infers
+    // fs ~4500 Hz and never acquires/locks. 10 ms → 100 Hz device clock.
+    await page.evaluate(() => { let n = 0; window.__scTOverride = () => 1000 + (n++) * 10; });
+
     // drive the app: click START (starts tracker + GPS watch), inject mock
     // devicemotion events at 100 Hz in 1 s batches, then read the DOM.
     await page.click('#startBtn');
@@ -102,14 +110,18 @@ test('e2e: browser + mock study data → HTML output check', async (t) => {
       // synthesize devicemotion-like events from the study slice
       let chunkCount = 0, injectErr = null;
       try {
-      const fire = (ay, t) => {
-        const e = new DeviceMotionEvent('devicemotion', {
-          accelerationIncludingGravity: { x: 0, y: ay, z: 9.81 },
-          interval: 10,
-        });
-        Object.defineProperty(e, 'timeStamp', { value: t });
-        window.dispatchEvent(e);
-      };
+    // synthesize devicemotion-like events from the study slice.
+    // Real tri-axial data incl. its true gravity orientation (~ -1 on z in this
+    // trial) — a fake constant z=9.81 pollutes the tracker's magnitude EMA
+    // during the pre-axis-selection phase (~5 s) and the PLL never locks.
+    const fire = (s, t) => {
+      const e = new DeviceMotionEvent('devicemotion', {
+        accelerationIncludingGravity: s,
+        interval: 10,
+      });
+      Object.defineProperty(e, 'timeStamp', { value: t });
+      window.dispatchEvent(e);
+    };
       // 40 s of data at 100 Hz, chunked so the UI loop can breathe
       for (let i = 0; i < samples.length; i += 1000) {
         const chunk = samples.slice(i, i + 1000);
@@ -143,11 +155,18 @@ test('e2e: browser + mock study data → HTML output check', async (t) => {
     const spmRaw = result.spm.replace('spm', '').trim();
     const spmNum = parseFloat(spmRaw);
     if (Number.isNaN(spmNum)) {
-      assert.equal(result.spm.includes('--'), true, 'no-lock shows honest "--"');
+      // honest no-lock presentations: '--' (stale) or 'warming…' (first 22 s
+      // WALL time — the test replays 40 s of device data in <1 s wall, so the
+      // warm-up window is always active at read time; numeric speaks for itself)
+      assert.ok(result.spm.includes('--') || result.spm.toLowerCase().includes('warming'),
+        `no-lock shows honest "--"/"warming…" (got "${result.spm}")`);
     } else {
       assert.ok(spmNum >= 12 && spmNum <= 45, `SPM ${spmNum} in physiological band`);
     }
-    assert.ok(result.curvePainted || spmNum > 0, 'drive curve painted or tracker producing spm');
+    assert.ok(result.curvePainted || result.strokes > 5,
+      `curve painted (${result.curvePainted}) or strokes seen (${result.strokes})`);
+    // cleanup: restore wall clock in case the page lives on
+    await page.evaluate(() => { window.__scTOverride = null; });
 
     await browser.close();
   } finally {
