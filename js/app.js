@@ -10,6 +10,7 @@ const state = {
   csvLog: [],
   motionActive: false,
   gpsSpeed: null,
+  ergMode: false,  // ERG/indoor: bypass the GPS speed gate (stale indoor fixes report ~0 m/s and block acquisition forever)
   lastSpmShown: null,
   lastSpmAt: 0,
   lastScreenLog: 0,  // last screen-state CSV line timestamp
@@ -49,7 +50,13 @@ function onMotion(e) {
 // shared modules: detector (acquisition) + tracker (smooth follow)
 const { smooth } = window.StrokeDetector;
 const trackerOpts = {
-  detectorOpts: { gateSpeed: () => state.gpsSpeed },
+  // GPS speed gate (dock guard, detector gateMinSpeed 0.5 m/s) bypassed in
+  // ERG MODE: stale indoor fixes report ~0 m/s and would block acquisition
+  // FOREVER — Bence's 09-12 indoor session: no spm, no graph. The detector
+  // still needs samples+harmonic content, so dock false-positives die anyway.
+  detectorOpts: {
+    gateSpeed: () => state.ergMode ? null : state.gpsSpeed,
+  },
 };
 
 // ---------- GPS ----------
@@ -59,7 +66,6 @@ function onGps(pos) {
   state.csvLog.push(`G,${now},${c.latitude.toFixed(6)},${c.longitude.toFixed(6)},` +
     `${(c.speed ?? -1).toFixed(3)},${(c.accuracy ?? -1).toFixed(1)},${(c.heading ?? -1).toFixed(1)}`);
   if (c.speed != null && c.accuracy != null && c.accuracy < 25) {
-    $('speed').firstChild.textContent = (c.speed * 3.6).toFixed(1);
     $('pace').textContent = c.speed > 0.4 ? fmtPace(500 / c.speed) : '--:--';
   }
   $('gps').textContent = c.accuracy < 25 ? `±${Math.round(c.accuracy)}m` : 'weak';
@@ -217,7 +223,6 @@ function saveSession() {
     durationS: Math.round((Date.now() - state.startT) / 1000),
     distanceM: Math.round(state.distance),
     avgSpm: $('spm').firstChild.textContent,
-    avgKmh: $('speed').innerText.trim(),
   });
   localStorage.setItem('sc_sessions', JSON.stringify(sessions.slice(0, 50)));
 }
@@ -225,7 +230,7 @@ function saveSession() {
 function renderHistory() {
   const sessions = JSON.parse(localStorage.getItem('sc_sessions') || '[]');
   $('sessionList').innerHTML = sessions.map(s =>
-    `<li>${new Date(s.date).toLocaleString()} — ${s.distanceM} m · ${s.avgSpm} spm · ${s.avgKmh} km/h</li>`).join('');
+    `<li>${new Date(s.date).toLocaleString()} — ${s.distanceM} m · ${s.avgSpm} spm</li>`).join('');
 }
 
 function exportCsv() {
@@ -237,6 +242,11 @@ function exportCsv() {
   a.click();
 }
 
+// wire the ERG MODE toggle + start
+state.ergMode = $('ergChk') ? $('ergChk').checked : false;
+$('ergChk').addEventListener('change', () => {
+  state.ergMode = $('ergChk').checked;
+});
 $('startBtn').addEventListener('click', start);
 $('stopBtn').addEventListener('click', stop);
 $('exportBtn').addEventListener('click', exportCsv);

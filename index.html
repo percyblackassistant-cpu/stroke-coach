@@ -27,6 +27,9 @@ button.primary { font-size: 28px; padding: 18px 48px; border-radius: 12px;
 <body>
   <main>
     <button id="startBtn" class="primary">START</button>
+    <label id="ergWrap" style="display:flex;align-items:center;gap:8px;justify-content:center;margin-top:10px;color:#9aa7b1;font-size:14px;">
+      <input type="checkbox" id="ergChk"> ERG MODE (indoor / no GPS — disables the moving-speed gate)
+    </label>
 
     <section id="dashboard" hidden>
       <div id="chartPanel">
@@ -48,11 +51,10 @@ button.primary { font-size: 28px; padding: 18px 48px; border-radius: 12px;
         </div>
         <div class="cardRow2">
           <div class="card"><label>Distance</label><span class="num"><span id="dist">0</span><span class="unit">m</span></span></div>
-          <div class="card"><label>Speed</label><span class="num"><span id="speed">--</span><span class="unit">km/h</span></span></div>
+          <button id="stopBtn">STOP &amp; SAVE</button>
         </div>
         <div class="cardRow2">
           <div class="card"><label>GPS</label><span class="num sm" id="gps">no fix</span></div>
-          <button id="stopBtn">STOP &amp; SAVE</button>
         </div>
       </div>
     </section>
