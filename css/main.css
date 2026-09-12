@@ -17,8 +17,8 @@ main { max-width: 900px; margin: 0 auto; padding: 12px env(safe-area-inset-right
 .card .num.sm { font-size: 26px; }
 .card .unit { font-size: 40%; color: #29b6f6; }
 .card .num.txtMode { font-size: min(26px, 6.5vw); letter-spacing: 0.5px; }
-#spm.txtMode, #speed.txtMode { font-size: min(26px, 7vw) !important; }
-@media (orientation: landscape) { #spm.txtMode, #speed.txtMode { font-size: 5vh !important; } }
+#spm.txtMode, #speed.txtMode { font-size: min(26px, 6.5vw) !important; }
+@media (orientation: landscape) { #spm.txtMode { font-size: 15px !important; letter-spacing: 0; } /* status text ('warming…') must fit the small landscape card; numeric path keeps the vh scale */ }
 #chartPanel { display: grid; gap: 8px; }
 .chartCard { padding: 10px 12px 6px; }
 .axisY { font-size: 13px; color: #9aa7b1; text-align: left; }
@@ -33,6 +33,11 @@ main { max-width: 900px; margin: 0 auto; padding: 12px env(safe-area-inset-right
   background: #161b20; border: 1px solid #3a2020; border-radius: 10px;
   color: #ff5252; font-size: 18px; font-weight: 600; padding: 10px;
 }
+.ergWrap { display: flex; align-items: center; gap: 8px; justify-content: center;
+  margin-top: 10px; color: #9aa7b1; font-size: 14px; text-align: center; }
+.ergWrap[hidden] { display: none; }   /* flex beats the UA hidden rule otherwise */
+.ergWrap input { width: 20px; height: 20px; accent-color: #1652f0; }
+#ergWrap.active { color: #7fd4ff; }
 
 button.primary { font-size: 28px; padding: 18px 48px; border-radius: 12px; border: none; background: #1652f0; color: white; width: 100%; }
 button#exportBtn, #clearBtn { width: 100%; padding: 10px; margin-top: 8px; }

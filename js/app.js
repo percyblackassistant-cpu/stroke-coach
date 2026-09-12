@@ -195,6 +195,7 @@ async function start() {
     $('gps').textContent = 'gps err';
   }, { enableHighAccuracy: true, maximumAge: 1000 });
   $('startBtn').hidden = true;
+  $('ergWrap').hidden = true;   // toggle is a pre-session control; not needed mid-row
   $('dashboard').hidden = false;
   $('exportBtn').hidden = false;
   requestAnimationFrame(tick);
@@ -205,6 +206,7 @@ function stop() {
   if (state.watchId != null) navigator.geolocation.clearWatch(state.watchId);
   saveSession();
   $('startBtn').hidden = false;
+  $('ergWrap').hidden = false;   // next session needs the toggle again
   $('dashboard').hidden = true;
   renderHistory();
 }
@@ -246,6 +248,7 @@ function exportCsv() {
 state.ergMode = $('ergChk') ? $('ergChk').checked : false;
 $('ergChk').addEventListener('change', () => {
   state.ergMode = $('ergChk').checked;
+  $('ergWrap').classList.toggle('active', state.ergMode);
 });
 $('startBtn').addEventListener('click', start);
 $('stopBtn').addEventListener('click', stop);
