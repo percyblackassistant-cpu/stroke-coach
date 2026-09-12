@@ -139,7 +139,6 @@ function drawScope() {
   }
 }
 
-// erg-style drive curve (normalized shape, median of last ~8-12 strokes)
 function setSpmDisplay(v) {
   const el = $('spm');
   el.firstChild.textContent = v;
@@ -150,53 +149,26 @@ function drawCurve() {
   const c = $('curve'), ctx = c.getContext('2d');
   ctx.clearRect(0, 0, c.width, c.height);
   if (!state.tracker) return;
-  // per-stroke curves: each stroke its own line (Bence 09-10), newest brightest
-  let curves;
-  try { curves = state.tracker.strokeCurves ? state.tracker.strokeCurves(8) : null; } catch { curves = null; }
-  if (curves && curves.length) {
-    // shared height scale: normalize each curve by its own max keeps classic erg
-    // look; shared max keeps relative force honest. Use shared max.
-  // LIVE partial path for the in-progress stroke (Bence 09-11: the last
-  // stroke must be visible while it's being pulled, not only after completion)
-  let partial = null;
-  try { partial = state.tracker.strokeCurvesPartial ? state.tracker.strokeCurvesPartial(64) : null; } catch { partial = null; }
-  const mx = Math.max(
-    ...curves.flatMap(s => s.curve.map(v => Math.abs(v))),
-    ...(partial ? partial.curve.map(v => Math.abs(v)) : [0]),
-    0.01);
-    curves.forEach((s, ci) => {
-      const alpha = 0.25 + 0.75 * (ci + 1) / curves.length;
-      ctx.strokeStyle = `rgba(255, 225, 77, ${alpha.toFixed(2)})`;
-      ctx.lineWidth = ci === curves.length - 1 ? 2.5 : 1.5;
-      ctx.beginPath();
-      s.curve.forEach((v, i) => {
-        const x = i / (s.curve.length - 1) * c.width;
-        const y = c.height - 6 - (v / mx) * (c.height - 16);
-        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-      });
-      ctx.stroke();
-    });
-    // the live stroke drawn last, on top, full brightness
-    if (partial && partial.curve.length > 3) {
-      ctx.strokeStyle = 'rgba(255, 240, 140, 0.95)';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      partial.curve.forEach((v, i) => {
-        const x = i / (partial.curve.length - 1) * c.width;
-        const y = c.height - 6 - (v / mx) * (c.height - 16);
-        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-      });
-      ctx.stroke();
-    }
-    return;
+  // ONE stroke per frame (Bence 09-12): the force graph shows the most recent
+  // stroke only — no multi-stroke overlay. While the stroke is being pulled,
+  // the live partial path grows; between drive-end and the next catch the
+  // completed stroke holds until the next catch replaces it.
+  let curve = null;
+  try { curve = state.tracker.strokeCurvesPartial ? state.tracker.strokeCurvesPartial(64) : null; } catch { curve = null; }
+  if (!curve || !curve.curve || curve.curve.length < 4) {
+    // no live partial right now (drive window finished): hold the newest
+    // completed stroke so the graph never shows two strokes at once
+    curve = null;
+    let done = null;
+    try { done = state.tracker.strokeCurves ? state.tracker.strokeCurves(1) : null; } catch { done = null; }
+    if (done && done.length) curve = done[done.length - 1];
   }
-  // fallback until 3 strokes complete: median blend (old behavior)
-  const curve = state.tracker.driveCurve();
-  if (!curve) return;
-  ctx.strokeStyle = '#ffe14d'; ctx.lineWidth = 2; ctx.beginPath();
-  curve.forEach((v, i) => {
-    const x = i / (curve.length - 1) * c.width;
-    const y = c.height / 2 - v * (c.height / 2 - 6);
+  if (!curve || !curve.curve || curve.curve.length < 4) return;
+  // curves are normalized by their own max (tracker): ±1 full-scale, per-stroke
+  ctx.strokeStyle = 'rgba(255, 225, 77, 0.95)'; ctx.lineWidth = 2.5; ctx.beginPath();
+  curve.curve.forEach((v, i) => {
+    const x = i / (curve.curve.length - 1) * c.width;
+    const y = Math.min(c.height - 2, Math.max(2, c.height - 6 - v * (c.height - 16)));
     i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
   });
   ctx.stroke();
